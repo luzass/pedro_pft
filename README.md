@@ -125,6 +125,8 @@ Fechar 50%
 
 No fechamento, parcial e stop loss, o admin informa os pontos manualmente. No stop loss, informe os pontos de loss como número positivo; o app salva o resultado como negativo. Quando a operação fecha ou stopa, o banco soma os pontos das parciais com os pontos finais e grava o total da operação para o dashboard.
 
+As mensagens enviadas para o WhatsApp usam ponto decimal nos preços, por exemplo `1.33411`, para facilitar copiar e colar. O botão `Enviar pendentes` só aparece quando existe mensagem com `status = 'queued'` na tabela `message_queue`.
+
 Use n8n se você quiser montar o fluxo visualmente, com painéis de retry, alertas e integrações extras. Para este MVP, a integração direta com Evolution API é mais simples e tem menos peças no caminho.
 
 Não coloque `SUPABASE_SERVICE_ROLE_KEY` nem `EVOLUTION_API_KEY` no navegador. Elas devem ficar apenas no `.env` local ou nas variáveis de ambiente da Vercel.

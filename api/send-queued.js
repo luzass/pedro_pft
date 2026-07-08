@@ -44,7 +44,7 @@ module.exports = async function sendQueued(request, response) {
       const attempts = Number(item.attempts || 0) + 1;
 
       try {
-        const text = item.payload?.text;
+        const text = normalizeOutboundMessage(item.payload?.text);
         if (!text) {
           throw new Error("Mensagem sem texto no payload.");
         }
@@ -204,6 +204,11 @@ function getExternalMessageId(result) {
     result?.id ||
     null
   );
+}
+
+function normalizeOutboundMessage(text) {
+  if (!text) return "";
+  return String(text).replace(/(\d),(\d)/g, "$1.$2");
 }
 
 function getEnv() {

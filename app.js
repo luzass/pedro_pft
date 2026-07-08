@@ -10,6 +10,7 @@ const state = {
   configSource: "manual",
   openOperations: [],
   events: [],
+  pendingMessagesCount: 0,
 };
 
 const priceFormat = new Intl.NumberFormat("pt-BR", {
@@ -296,9 +297,11 @@ function handleSessionChange() {
 
   state.openOperations = [];
   state.events = [];
+  state.pendingMessagesCount = 0;
   showSignedOutView();
   renderOpenOperations();
   renderEvents();
+  updateSendQueuedButton();
   renderDashboard([]);
 }
 
@@ -316,6 +319,8 @@ function showSignedOutView() {
   els.appShell.hidden = true;
   els.signOutButton.disabled = true;
   els.signedUser.textContent = "";
+  state.pendingMessagesCount = 0;
+  updateSendQueuedButton();
   setAppDisabled(true);
 }
 
@@ -330,13 +335,13 @@ function setAppDisabled(disabled) {
 }
 
 async function loadAllData(options = {}) {
-  await Promise.all([loadOpenOperations(), loadDashboard(), loadEvents()]);
+  await Promise.all([loadOpenOperations(), loadDashboard(), loadEvents(), loadPendingMessages()]);
 
   if (options.retryQueued) {
     const dispatchResult = await triggerQueuedMessageDispatch();
     if (dispatchResult.ok && dispatchResult.processed > 0) {
       showToast(`${dispatchResult.processed} mensagem(ns) pendente(s) enviada(s).`);
-      await loadEvents();
+      await Promise.all([loadEvents(), loadPendingMessages()]);
     }
   }
 }
@@ -347,6 +352,7 @@ async function handleSendQueuedMessages() {
   const dispatchResult = await triggerQueuedMessageDispatch();
   if (!dispatchResult.ok) {
     showToast(`Envio pendente: ${dispatchResult.error}`);
+    await loadPendingMessages();
     return;
   }
 
@@ -355,7 +361,7 @@ async function handleSendQueuedMessages() {
       ? `${dispatchResult.processed} mensagem(ns) enviada(s).`
       : "Nenhuma mensagem pendente.",
   );
-  await loadEvents();
+  await Promise.all([loadEvents(), loadPendingMessages()]);
 }
 
 async function handleOperationSubmit(event) {
@@ -622,6 +628,39 @@ async function loadEvents() {
   renderEvents();
 }
 
+async function loadPendingMessages() {
+  if (!state.client || !state.session) {
+    state.pendingMessagesCount = 0;
+    updateSendQueuedButton();
+    return;
+  }
+
+  const { count, error } = await state.client
+    .from("message_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "queued");
+
+  if (error) {
+    state.pendingMessagesCount = 0;
+    updateSendQueuedButton();
+    return;
+  }
+
+  state.pendingMessagesCount = count || 0;
+  updateSendQueuedButton();
+}
+
+function updateSendQueuedButton() {
+  if (!els.sendQueuedMessages) return;
+
+  const hasPending = state.pendingMessagesCount > 0;
+  els.sendQueuedMessages.hidden = !hasPending;
+  els.sendQueuedMessages.disabled = !state.session || !hasPending;
+  els.sendQueuedMessages.textContent = hasPending
+    ? `Enviar pendentes (${state.pendingMessagesCount})`
+    : "Enviar pendentes";
+}
+
 function renderOpenOperations() {
   if (!state.openOperations.length) {
     els.openOperations.innerHTML = '<div class="empty">Nenhuma operação aberta.</div>';
@@ -821,9 +860,9 @@ function buildOpenedMessage(operation) {
     `Ativo: *${operation.pair}*`,
     `Operação n°: ${formatOperationNumber(operation)}`,
     "",
-    `Preço de entrada: ${formatPrice(operation.entry_price)}`,
-    `Stop Loss: ${formatPrice(operation.stop_loss)}`,
-    `Take Profit: ${formatPrice(operation.take_profit)}`,
+    `Preço de entrada: ${formatMessagePrice(operation.entry_price)}`,
+    `Stop Loss: ${formatMessagePrice(operation.stop_loss)}`,
+    `Take Profit: ${formatMessagePrice(operation.take_profit)}`,
   ].join("\n");
 }
 
@@ -833,9 +872,9 @@ function buildActionMessage(operation, action, price, points, closePercent) {
       `Operação n°: ${formatOperationNumber(operation)}`,
       "*PARCIAL*",
       "",
-      `Preço da Parcial: ${formatPrice(price)}`,
-      `Fechar ${formatPercent(closePercent)}`,
-      `Pontos da parcial: ${formatSignedPoints(points)} pts`,
+      `Preço da Parcial: ${formatMessagePrice(price)}`,
+      `Fechar ${formatMessagePercent(closePercent)}`,
+      `Pontos da parcial: ${formatMessageSignedPoints(points)} pts`,
     ].join("\n");
   }
 
@@ -844,8 +883,8 @@ function buildActionMessage(operation, action, price, points, closePercent) {
       `Operação n°: ${formatOperationNumber(operation)}`,
       "*FECHADA*",
       "",
-      `Preço de fechamento: ${formatPrice(price)}`,
-      `Resultado: ${formatSignedPoints(points)} pts`,
+      `Preço de fechamento: ${formatMessagePrice(price)}`,
+      `Resultado: ${formatMessageSignedPoints(points)} pts`,
     ].join("\n");
   }
 
@@ -854,8 +893,8 @@ function buildActionMessage(operation, action, price, points, closePercent) {
       `Operação n°: ${formatOperationNumber(operation)}`,
       "*STOP LOSS*",
       "",
-      `Preço do stop: ${formatPrice(price)}`,
-      `Resultado: ${formatSignedPoints(points)} pts`,
+      `Preço do stop: ${formatMessagePrice(price)}`,
+      `Resultado: ${formatMessageSignedPoints(points)} pts`,
     ].join("\n");
   }
 
@@ -949,6 +988,28 @@ function getMonthRange(monthValue) {
 function formatPrice(value) {
   if (value === null || value === undefined || value === "") return "-";
   return priceFormat.format(Number(value));
+}
+
+function formatMessagePrice(value) {
+  return formatMessageNumber(value, 8);
+}
+
+function formatMessagePercent(value) {
+  return `${formatMessageNumber(value, 1)}%`;
+}
+
+function formatMessageSignedPoints(value) {
+  const numeric = Number(value || 0);
+  return `${numeric > 0 ? "+" : ""}${formatMessageNumber(numeric, 1)}`;
+}
+
+function formatMessageNumber(value, maximumFractionDigits) {
+  if (value === null || value === undefined || value === "") return "-";
+
+  return Number(value).toLocaleString("en-US", {
+    useGrouping: false,
+    maximumFractionDigits,
+  });
 }
 
 function formatPoints(value) {
