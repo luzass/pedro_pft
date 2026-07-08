@@ -27,6 +27,18 @@ select
   to_regprocedure('public.enqueue_operation_message()') is not null;
 
 select
+  table_name,
+  column_name,
+  data_type
+from information_schema.columns
+where table_schema = 'public'
+  and (
+    (table_name = 'operations' and column_name in ('risk_percent', 'lot_size', 'remaining_lot_size', 'pip_value_account', 'result_amount'))
+    or (table_name = 'operation_events' and column_name in ('lot_size', 'remaining_lot_size', 'amount'))
+  )
+order by table_name, column_name;
+
+select
   email,
   role,
   created_at

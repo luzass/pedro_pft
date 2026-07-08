@@ -84,6 +84,10 @@
                 <strong id="statPoints">0</strong>
               </article>
               <article class="stat">
+                <span>Resultado USD</span>
+                <strong id="statAmount">$0.00</strong>
+              </article>
+              <article class="stat">
                 <span>Gain</span>
                 <strong id="statWins">0</strong>
               </article>
@@ -104,8 +108,10 @@
                     <th>Par</th>
                     <th>Direção</th>
                     <th>Entrada</th>
+                    <th>Lote</th>
                     <th>Fechamento</th>
                     <th>Resultado</th>
+                    <th>USD</th>
                     <th>Data</th>
                   </tr>
                 </thead>
@@ -136,17 +142,27 @@
                 </label>
                 <label>
                   Entrada
-                  <input id="entryPrice" type="number" step="0.00001" min="0" required />
+                  <input id="entryPrice" type="text" inputmode="decimal" autocomplete="off" required />
                 </label>
                 <label>
                   Stop loss
-                  <input id="stopLoss" type="number" step="0.00001" min="0" required />
+                  <input id="stopLoss" type="text" inputmode="decimal" autocomplete="off" required />
                 </label>
                 <label>
                   Take profit
-                  <input id="takeProfit" type="number" step="0.00001" min="0" required />
+                  <input id="takeProfit" type="text" inputmode="decimal" autocomplete="off" required />
+                </label>
+                <label>
+                  Risco da conta (%)
+                  <input id="riskPercent" type="number" step="0.01" min="0.01" max="100" value="0.25" required />
+                </label>
+                <label id="conversionRateField" class="conversion-field" hidden>
+                  Cotacao p/ USD
+                  <input id="conversionRate" type="text" inputmode="decimal" autocomplete="off" />
+                  <small id="conversionHint"></small>
                 </label>
               </div>
+              <div id="riskPreview" class="risk-preview"></div>
               <label>
                 Observação
                 <textarea id="notes" rows="3"></textarea>
