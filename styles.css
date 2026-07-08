@@ -479,8 +479,21 @@ h2 {
   grid-template-columns: minmax(0, 1fr) minmax(92px, 0.32fr) minmax(92px, 0.32fr) auto;
 }
 
+.action-grid form.quick-action-form,
+.action-grid form[data-operation-action="stopped"] {
+  grid-template-columns: 1fr;
+}
+
 .action-grid form.cancel-form {
   grid-template-columns: 1fr;
+}
+
+button.gain-button {
+  background: var(--gain);
+}
+
+button.gain-button:hover {
+  background: #116932;
 }
 
 button.loss-button {

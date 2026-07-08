@@ -6,8 +6,8 @@ App simples para registrar operações, acompanhar operações abertas, enviar a
 
 - Tela de acesso usando usuários do Authentication do Supabase.
 - Cadastro de operação com par, direção, entrada, stop e take.
-- Ações de admin para parcial, fechamento, stop loss e cancelamento.
-- Pontos informados manualmente em parcial, fechamento e stop loss.
+- Ações de admin para parcial, fechamento manual, take profit cheio, stop loss e cancelamento.
+- Pontos calculados automaticamente pelo preço da parcial/fechamento ou pelo take/stop cadastrados.
 - Dashboard mensal com operações fechadas, pontos, gain, loss e taxa de acerto.
 - Histórico de mensagens.
 - Fila `message_queue` para enviar mensagens pelo WhatsApp via Evolution API.
@@ -123,7 +123,7 @@ Preço da Parcial:
 Fechar 50%
 ```
 
-No fechamento, parcial e stop loss, o admin informa os pontos manualmente. No stop loss, informe os pontos de loss como número positivo; o app salva o resultado como negativo. Quando a operação fecha ou stopa, o banco soma os pontos das parciais com os pontos finais e grava o total da operação para o dashboard.
+No take profit cheio e no stop loss, o admin só clica no botão e o app usa os preços cadastrados na abertura. Na parcial ou fechamento manual, o admin informa o preço e o app calcula os pontos automaticamente. Quando a operação fecha ou stopa, o banco soma os pontos das parciais com os pontos finais e grava o total da operação para o dashboard.
 
 As mensagens enviadas para o WhatsApp usam ponto decimal nos preços, por exemplo `1.33411`, para facilitar copiar e colar. O botão `Enviar pendentes` só aparece quando existe mensagem com `status = 'queued'` na tabela `message_queue`.
 

@@ -92,6 +92,7 @@ function bindEvents() {
   els.refreshEvents.addEventListener("click", loadEvents);
   els.sendQueuedMessages.addEventListener("click", handleSendQueuedMessages);
   els.openOperations.addEventListener("submit", handleOperationAction);
+  els.openOperations.addEventListener("input", handleOperationActionInput);
   els.dashboardMonth.addEventListener("change", loadDashboard);
 
   document.querySelectorAll(".tab").forEach((button) => {
@@ -421,20 +422,18 @@ async function handleOperationAction(event) {
 
   const action = form.dataset.operationAction;
   const formData = new FormData(form);
-  const price = parseOptionalNumber(formData.get("price"));
-  const rawPoints = parseOptionalNumber(formData.get("points"));
-  const closePercent = parseOptionalNumber(formData.get("closePercent"));
+  const actionValues = getActionValues(operation, action, formData);
+  const { eventType, price, points, closePercent } = actionValues;
 
-  const validation = validateAction(action, price, rawPoints, closePercent);
+  const validation = validateAction(action, price, closePercent);
   if (!validation.ok) {
     showToast(validation.message);
     return;
   }
 
-  const points = action === "stopped" ? -Math.abs(rawPoints) : rawPoints;
   const eventError = await createEvent({
     operationId: operation.id,
-    type: action,
+    type: eventType,
     price,
     points,
     closePercent,
@@ -461,21 +460,72 @@ async function handleOperationAction(event) {
   await loadAllData();
 }
 
-function validateAction(action, price, points, closePercent) {
+function handleOperationActionInput(event) {
+  const form = event.target.closest("[data-operation-action]");
+  if (!form) return;
+
+  const action = form.dataset.operationAction;
+  if (!["partial", "closed"].includes(action)) return;
+
+  const operation = state.openOperations.find((item) => item.id === form.dataset.operationId);
+  const pointsInput = form.querySelector('[name="points"]');
+  if (!operation || !pointsInput) return;
+
+  const price = parseOptionalNumber(new FormData(form).get("price"));
+  if (!Number.isFinite(price) || price <= 0) {
+    pointsInput.value = "";
+    return;
+  }
+
+  pointsInput.value = formatNumberInput(calculateResultPoints(operation, price));
+}
+
+function getActionValues(operation, action, formData) {
+  if (action === "take") {
+    const price = Number(operation.take_profit);
+    return {
+      eventType: "closed",
+      price,
+      points: calculateResultPoints(operation, price),
+      closePercent: null,
+    };
+  }
+
+  if (action === "stopped") {
+    const price = Number(operation.stop_loss);
+    return {
+      eventType: "stopped",
+      price,
+      points: calculateResultPoints(operation, price),
+      closePercent: null,
+    };
+  }
+
+  if (action === "canceled") {
+    return {
+      eventType: "canceled",
+      price: null,
+      points: null,
+      closePercent: null,
+    };
+  }
+
+  const price = parseOptionalNumber(formData.get("price"));
+  return {
+    eventType: action,
+    price,
+    points: Number.isFinite(price) ? calculateResultPoints(operation, price) : null,
+    closePercent: action === "partial" ? parseOptionalNumber(formData.get("closePercent")) : null,
+  };
+}
+
+function validateAction(action, price, closePercent) {
   if (action === "canceled") {
     return { ok: true };
   }
 
   if (!Number.isFinite(price) || price <= 0) {
     return { ok: false, message: "Informe o preço da ação." };
-  }
-
-  if (!Number.isFinite(points)) {
-    return { ok: false, message: "Informe os pontos manualmente." };
-  }
-
-  if (action === "stopped" && points <= 0) {
-    return { ok: false, message: "Informe os pontos de loss como número positivo." };
   }
 
   if (
@@ -557,7 +607,7 @@ async function updateOperationFromAction(operationId, action, price, points) {
     patch.status = "partial";
   }
 
-  if (action === "closed" || action === "stopped") {
+  if (action === "closed" || action === "take" || action === "stopped") {
     patch.status = "closed";
     patch.close_price = price;
     patch.closed_at = new Date().toISOString();
@@ -673,6 +723,8 @@ function renderOpenOperations() {
 function renderOperationCard(operation) {
   const sideLabel = operation.side === "buy" ? "Compra" : "Venda";
   const statusLabel = operation.status === "partial" ? "Parcial" : "Aberta";
+  const stopPoints = calculateResultPoints(operation, operation.stop_loss);
+  const takePoints = calculateResultPoints(operation, operation.take_profit);
 
   return `
     <article class="operation-card">
@@ -692,11 +744,11 @@ function renderOperationCard(operation) {
         </div>
         <div class="metric">
           <span>Stop loss</span>
-          <strong>${formatPrice(operation.stop_loss)}</strong>
+          <strong>${formatPrice(operation.stop_loss)} / ${formatSignedPoints(stopPoints)} pts</strong>
         </div>
         <div class="metric">
           <span>Take profit</span>
-          <strong>${formatPrice(operation.take_profit)}</strong>
+          <strong>${formatPrice(operation.take_profit)} / ${formatSignedPoints(takePoints)} pts</strong>
         </div>
         <div class="metric">
           <span>Status</span>
@@ -707,18 +759,19 @@ function renderOperationCard(operation) {
         <form data-operation-action="partial" data-operation-id="${operation.id}">
           <input name="price" type="number" step="0.00001" min="0" placeholder="Preço parcial" required />
           <input name="closePercent" type="number" step="1" min="1" max="100" placeholder="% fechar" required />
-          <input name="points" type="number" step="0.1" placeholder="Pontos" required />
+          <input name="points" type="text" placeholder="Pontos" readonly />
           <button class="secondary" type="submit">Parcial</button>
         </form>
         <form data-operation-action="closed" data-operation-id="${operation.id}">
           <input name="price" type="number" step="0.00001" min="0" placeholder="Preço final" required />
-          <input name="points" type="number" step="0.1" placeholder="Pontos" required />
+          <input name="points" type="text" placeholder="Pontos" readonly />
           <button type="submit">Fechar</button>
         </form>
+        <form class="quick-action-form" data-operation-action="take" data-operation-id="${operation.id}">
+          <button class="gain-button" type="submit">Take profit ${formatSignedPoints(takePoints)} pts</button>
+        </form>
         <form data-operation-action="stopped" data-operation-id="${operation.id}">
-          <input name="price" type="number" step="0.00001" min="0" placeholder="Preço stop" required />
-          <input name="points" type="number" step="0.1" min="0" placeholder="Pts loss" required />
-          <button class="loss-button" type="submit">Stop loss</button>
+          <button class="loss-button" type="submit">Stop loss ${formatSignedPoints(stopPoints)} pts</button>
         </form>
         <form class="cancel-form" data-operation-action="canceled" data-operation-id="${operation.id}">
           <button class="ghost" type="submit">Cancelar</button>
@@ -800,12 +853,15 @@ function renderEvents() {
 }
 
 function getOperationFormData() {
+  const pair = normalizePair(els.pair.value);
+
   return {
-    pair: normalizePair(els.pair.value),
+    pair,
     side: els.side.value,
     entry_price: Number(els.entryPrice.value),
     stop_loss: Number(els.stopLoss.value),
     take_profit: Number(els.takeProfit.value),
+    point_size: inferPointSize(pair),
     notes: els.notes.value.trim() || null,
   };
 }
@@ -888,6 +944,16 @@ function buildActionMessage(operation, action, price, points, closePercent) {
     ].join("\n");
   }
 
+  if (action === "take") {
+    return [
+      `Operação n°: ${formatOperationNumber(operation)}`,
+      "*TAKE PROFIT*",
+      "",
+      `Preço do take: ${formatMessagePrice(price)}`,
+      `Resultado: ${formatMessageSignedPoints(points)} pts`,
+    ].join("\n");
+  }
+
   if (action === "stopped") {
     return [
       `Operação n°: ${formatOperationNumber(operation)}`,
@@ -961,7 +1027,38 @@ function normalizeProjectUrl(value) {
 }
 
 function normalizePair(value) {
-  return value.trim().replace(/\s+/g, "").replace("-", "/").toUpperCase();
+  const normalized = value.trim().replace(/\s+/g, "").replace("-", "/").toUpperCase();
+  if (/^[A-Z]{6}$/.test(normalized)) {
+    return `${normalized.slice(0, 3)}/${normalized.slice(3)}`;
+  }
+
+  return normalized;
+}
+
+function inferPointSize(pair) {
+  const normalized = normalizePair(pair);
+  if (!normalized) return 0.0001;
+  if (normalized.includes("JPY")) return 0.01;
+  if (normalized.includes("XAU") || normalized.includes("GOLD")) return 0.1;
+  if (normalized.includes("BTC") || normalized.includes("ETH")) return 1;
+  return 0.0001;
+}
+
+function calculateResultPoints(operation, price) {
+  const entry = Number(operation.entry_price);
+  const actionPrice = Number(price);
+  const pointSize = Number(operation.point_size || inferPointSize(operation.pair));
+  const diff = operation.side === "buy" ? actionPrice - entry : entry - actionPrice;
+  return roundPoints(diff / pointSize);
+}
+
+function roundPoints(value) {
+  return Math.round(Number(value) * 10) / 10;
+}
+
+function formatNumberInput(value) {
+  if (!Number.isFinite(value)) return "";
+  return String(roundPoints(value));
 }
 
 function parseOptionalNumber(value) {
@@ -1051,6 +1148,7 @@ function actionToast(action) {
   const labels = {
     partial: "Parcial registrada.",
     closed: "Operação fechada.",
+    take: "Take profit registrado.",
     stopped: "Stop loss registrado.",
     canceled: "Operação cancelada.",
   };
