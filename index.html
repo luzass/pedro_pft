@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel de Operações</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section id="accessScreen" class="access-screen">
+        <form id="authForm" class="access-card">
+          <div>
+            <p class="eyebrow">Trading desk</p>
+            <h1>Acesso</h1>
+          </div>
+
+          <div class="connection">
+            <span id="connectionDot" class="dot"></span>
+            <span id="connectionLabel">Conectando</span>
+          </div>
+
+          <label>
+            Email
+            <input id="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Senha
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+
+          <button id="signInButton" type="submit">Entrar</button>
+          <span id="authStatus" class="tag neutral">Aguardando login</span>
+        </form>
+
+        <form id="configForm" class="panel compact dev-config" hidden>
+          <div class="panel-heading">
+            <h2>Configuração local</h2>
+            <span id="configStatus" class="tag neutral">Pendente</span>
+          </div>
+          <label>
+            URL do projeto
+            <input id="supabaseUrl" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off" />
+          </label>
+          <label>
+            Anon key
+            <input id="supabaseAnonKey" type="password" autocomplete="off" />
+          </label>
+          <button type="submit">Salvar conexão</button>
+        </form>
+      </section>
+
+      <section id="appShell" class="app-shell" hidden>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Trading desk</p>
+            <h1>Painel de Operações</h1>
+          </div>
+          <div class="topbar-actions">
+            <span id="signedUser" class="user-pill"></span>
+            <button id="signOutButton" type="button" class="ghost">Sair</button>
+          </div>
+        </header>
+
+        <nav class="tabs" aria-label="Áreas do painel">
+          <button class="tab active" data-tab="dashboard">Dashboard</button>
+          <button class="tab" data-tab="operations">Painel de operações</button>
+          <button class="tab" data-tab="history">Histórico</button>
+        </nav>
+
+        <section id="dashboardTab" class="tab-panel active">
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>Dashboard</h2>
+              <input id="dashboardMonth" class="month-picker" type="month" />
+            </div>
+            <div class="stats-grid">
+              <article class="stat">
+                <span>Operações fechadas</span>
+                <strong id="statClosed">0</strong>
+              </article>
+              <article class="stat">
+                <span>Pontos do mês</span>
+                <strong id="statPoints">0</strong>
+              </article>
+              <article class="stat">
+                <span>Gain</span>
+                <strong id="statWins">0</strong>
+              </article>
+              <article class="stat">
+                <span>Loss</span>
+                <strong id="statLosses">0</strong>
+              </article>
+              <article class="stat">
+                <span>Taxa de acerto</span>
+                <strong id="statWinRate">0%</strong>
+              </article>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>N°</th>
+                    <th>Par</th>
+                    <th>Direção</th>
+                    <th>Entrada</th>
+                    <th>Fechamento</th>
+                    <th>Resultado</th>
+                    <th>Data</th>
+                  </tr>
+                </thead>
+                <tbody id="closedOperations"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="operationsTab" class="tab-panel">
+          <section class="operations-stack">
+            <form id="operationForm" class="panel form-panel">
+              <div class="panel-heading">
+                <h2>Nova operação</h2>
+                <span id="operationPreview" class="tag neutral">Pronta para envio</span>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Par
+                  <input id="pair" type="text" placeholder="EUR/USD" autocomplete="off" required />
+                </label>
+                <label>
+                  Direção
+                  <select id="side" required>
+                    <option value="buy">Compra</option>
+                    <option value="sell">Venda</option>
+                  </select>
+                </label>
+                <label>
+                  Entrada
+                  <input id="entryPrice" type="number" step="0.00001" min="0" required />
+                </label>
+                <label>
+                  Stop loss
+                  <input id="stopLoss" type="number" step="0.00001" min="0" required />
+                </label>
+                <label>
+                  Take profit
+                  <input id="takeProfit" type="number" step="0.00001" min="0" required />
+                </label>
+              </div>
+              <label>
+                Observação
+                <textarea id="notes" rows="3"></textarea>
+              </label>
+              <div class="button-row">
+                <button type="submit">Enviar operação</button>
+                <button id="resetOperationForm" type="button" class="secondary">Limpar</button>
+              </div>
+            </form>
+
+            <section class="panel list-panel">
+              <div class="panel-heading">
+                <h2>Operações abertas</h2>
+                <button id="refreshOperations" class="secondary small" type="button">Atualizar</button>
+              </div>
+              <div id="openOperations" class="operation-list"></div>
+            </section>
+          </section>
+        </section>
+
+        <section id="historyTab" class="tab-panel">
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>Histórico de mensagens</h2>
+              <div class="button-row">
+                <button id="sendQueuedMessages" class="secondary small" type="button">Enviar pendentes</button>
+                <button id="refreshEvents" class="secondary small" type="button">Atualizar</button>
+              </div>
+            </div>
+            <div id="eventList" class="event-list"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
